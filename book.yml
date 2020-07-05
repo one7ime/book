@@ -1,0 +1,81 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: book
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      type: app
+      service: book
+  template:
+    metadata:
+      labels:
+        type: app
+        service: book
+    spec:
+      containers:
+      - name: book
+        image: jamesby99/book:latest
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          timeoutSeconds: 2            
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 5
+          timeoutSeconds: 1                      
+        env:
+        - name: _DATASOURCE_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+               name: book-cm
+               key: db-address
+        - name: _DATASOURCE_TABLESPACE
+          valueFrom:
+            configMapKeyRef:
+               name: book-cm
+               key: db-table-sapce
+        - name: _DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+               name: book-secret
+               key: db-user
+        - name: _DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+               name: book-secret
+               key: db-pw
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book
+spec:
+  ports:
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+  selector:
+    type: app
+    service: book
+    
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: book
+spec:
+  maxReplicas: 20
+  minReplicas: 3
+  scaleTargetRef:
+    apiVersion: extensions/v1
+    kind: Deployment
+    name: book
+  targetCPUUtilizationPercentage: 50
